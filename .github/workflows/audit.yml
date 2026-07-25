@@ -1,0 +1,30 @@
+name: Audit
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'  # Weekly Monday 05:00 UTC
+  workflow_dispatch:
+    inputs:
+      categories:
+        description: 'Audit categories (workflow,secrets,dependencies,code)'
+        required: false
+        default: 'all'
+      fail-on:
+        description: 'Severity to fail on'
+        required: false
+        default: 'none'
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit
+    uses: ./.github/workflows/reusable-audit.yml
+    with:
+      categories: ${{ inputs.categories || 'all' }}
+      fail-on: ${{ inputs.fail-on || 'none' }}

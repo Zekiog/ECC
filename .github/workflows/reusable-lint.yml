@@ -18,12 +18,6 @@ on:
         required: false
         type: string
         default: 'all'
-  workflow_dispatch:
-    inputs:
-      linters:
-        description: 'Linters to run'
-        required: false
-        default: 'all'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

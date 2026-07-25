@@ -1,0 +1,41 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/**
+      - '**/*.js'
+      - '**/*.ts'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.sh'
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/**
+      - '**/*.js'
+      - '**/*.ts'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.sh'
+  workflow_dispatch:
+    inputs:
+      linters:
+        description: 'Linters to run'
+        required: false
+        default: 'all'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    uses: ./.github/workflows/reusable-lint.yml
+    with:
+      linters: ${{ inputs.linters || 'all' }}

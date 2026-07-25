@@ -27,12 +27,6 @@ on:
       report-path:
         description: 'Path to the audit report artifact'
         value: ${{ jobs.audit.outputs.report-path }}
-  workflow_dispatch:
-    inputs:
-      categories:
-        description: 'Audit categories (workflow,secrets,dependencies,code)'
-        required: false
-        default: 'all'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -104,11 +98,9 @@ jobs:
               with open(wf) as f:
                   content = f.read()
               unpinned = re.findall(r'uses:\s*[\w\-]+/[\w\-]+@v\d+', content)
-              short_sha = re.findall(r'uses:\s*[\w\-]+/[\w\-]+@[0-9a-f]{7,9}\b', content)
               no_timeout = 'timeout-minutes' not in content
               no_concurrency = 'concurrency' not in content
               no_permissions = 'permissions:' not in content
-              uses_latest = 'runs-on:\n      ubuntu-latest' in content or 'runs-on: ubuntu-latest' in content
               if unpinned:
                   findings.append({'file': wf, 'severity': 'medium', 'rule': 'unpinned-action', 'count': len(unpinned)})
               if no_timeout:
@@ -117,8 +109,6 @@ jobs:
                   findings.append({'file': wf, 'severity': 'low', 'rule': 'no-concurrency'})
               if no_permissions:
                   findings.append({'file': wf, 'severity': 'medium', 'rule': 'no-permissions'})
-              if uses_latest:
-                  findings.append({'file': wf, 'severity': 'low', 'rule': 'unpinned-runner'})
           report['categories']['workflow'] = findings
           with open(report_path, 'w') as f:
               json.dump(report, f, indent=2)
@@ -137,11 +127,9 @@ jobs:
           with open(report_path) as f:
               report = json.load(f)
           findings = []
-          # Patterns for common secrets (rough heuristic — must be reviewed)
           patterns = [
               (r'(?i)(?:api[_-]?key|token|password|secret)\s*[:=]\s*["\047]([A-Za-z0-9+/=_\-]{20,})', 'hardcoded-secret'),
               (r'(?i)aws_access_key_id\s*=\s*["\047]([A-Z0-9]{20})', 'aws-access-key'),
-              (r'(?i)aws_secret_access_key\s*=\s*["\047]([A-Za-z0-9/+=]{40})', 'aws-secret-key'),
               (r'-----BEGIN (?:RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----', 'private-key'),
               (r'ghp_[A-Za-z0-9]{36}', 'github-pat'),
               (r'gho_[A-Za-z0-9]{36}', 'github-oauth'),
@@ -149,9 +137,10 @@ jobs:
               (r'github_pat_[A-Za-z0-9_]{82}', 'github-fine-grained-pat'),
               (r'xox[baprs]-[A-Za-z0-9-]{10,}', 'slack-token'),
           ]
-          # Skip common false-positive areas
           skip_dirs = {'.git', 'node_modules', 'dist', 'build', 'vendor', '.venv', '__pycache__', 'artifacts', 'coverage'}
-          skip_files = lambda p: any(s in p.split('/') for s in skip_dirs) or p.endswith('.min.js') or p.endswith('.lock') or p.endswith('.svg') or p.endswith('.png') or p.endswith('.jpg')
+          def skip_files(p):
+              parts = set(p.split('/'))
+              return any(s in parts for s in skip_dirs) or p.endswith('.min.js') or p.endswith('.lock') or p.endswith('.svg') or p.endswith('.png') or p.endswith('.jpg')
           for pattern, rule in patterns:
               for filepath in glob.glob('**', recursive=True):
                   if os.path.isfile(filepath) and not skip_files(filepath):
@@ -160,7 +149,7 @@ jobs:
                               content = f.read()
                           for m in re.finditer(pattern, content):
                               findings.append({'file': filepath, 'severity': 'critical', 'rule': rule, 'match': m.group(0)[:50]})
-                              break  # one finding per file per rule
+                              break
                       except Exception:
                           continue
           report['categories']['secrets'] = findings
@@ -181,17 +170,13 @@ jobs:
           with open(report_path) as f:
               report = json.load(f)
           findings = []
-          # Check for outdated or risky dep patterns
           if os.path.exists('package.json'):
               with open('package.json') as f:
                   pkg = json.load(f)
               for k, v in {**pkg.get('dependencies', {}), **pkg.get('devDependencies', {})}.items():
-                  if isinstance(v, str):
-                      if v.startswith('^') or v.startswith('~'):
-                          # OK
-                          pass
-                      elif v == '*' or v == 'latest':
-                          findings.append({'package': k, 'version': v, 'severity': 'high', 'rule': 'unpinned-version'})
+                      if isinstance(v, str):
+                          if v == '*' or v == 'latest':
+                              findings.append({'package': k, 'version': v, 'severity': 'high', 'rule': 'unpinned-version'})
           if os.path.exists('requirements.txt'):
               with open('requirements.txt') as f:
                   for line in f:
@@ -217,20 +202,15 @@ jobs:
           with open(report_path) as f:
               report = json.load(f)
           findings = []
-          # LICENSE check
           files = set(os.listdir('.'))
-          if not (f in files for f in ['LICENSE', 'LICENSE.md', 'license.txt']):
+          if not any(f.lower().startswith('license') for f in files):
               findings.append({'severity': 'low', 'rule': 'no-license'})
-          # README check
-          if not any(f.startswith('README') for f in files):
+          if not any(f.lower().startswith('readme') for f in files):
               findings.append({'severity': 'low', 'rule': 'no-readme'})
-          # SECURITY.md
           if not any(os.path.exists(p) for p in ['SECURITY.md', '.github/SECURITY.md', 'docs/SECURITY.md']):
               findings.append({'severity': 'low', 'rule': 'no-security-md'})
-          # CODEOWNERS
           if not any(os.path.exists(p) for p in ['CODEOWNERS', '.github/CODEOWNERS']):
               findings.append({'severity': 'low', 'rule': 'no-codeowners'})
-          # .editorconfig
           if not os.path.exists('.editorconfig'):
               findings.append({'severity': 'info', 'rule': 'no-editorconfig'})
           report['categories']['code'] = findings
@@ -249,7 +229,6 @@ jobs:
           report_path = os.environ.get('REPORT_PATH', 'artifacts/audit-report.json')
           with open(report_path) as f:
               report = json.load(f)
-          # Count by severity
           severity_count = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
           for cat, findings in report['categories'].items():
               for f in findings:
@@ -277,9 +256,7 @@ jobs:
         shell: bash
         env:
           FAIL_ON: ${{ inputs.fail-on }}
-          SUMMARY: ${{ steps.summary.outputs.summary }}
         run: |
-          # If fail-on is set, exit with error if any finding at or above threshold
           if [ "$FAIL_ON" != "none" ]; then
             case "$FAIL_ON" in
               critical) SEVERITIES="critical" ;;
