@@ -61,10 +61,13 @@ jobs:
             INPUT="$ALL"
           fi
           echo "selected=$INPUT" >> "$GITHUB_OUTPUT"
-          echo "::group::Selected linters: $INPUT"
+          echo "Selected linters: $INPUT"
 
       - name: Install lint dependencies
-        if: steps.linters.outputs.selected contains 'eslint' || steps.linters.outputs.selected contains 'markdownlint' || steps.linters.outputs.selected contains 'prettier'
+        if: |
+          contains(steps.linters.outputs.selected, 'eslint') ||
+          contains(steps.linters.outputs.selected, 'markdownlint') ||
+          contains(steps.linters.outputs.selected, 'prettier')
         shell: bash
         run: |
           npm install --no-save --ignore-scripts \
@@ -75,7 +78,7 @@ jobs:
             prettier@3 2>/dev/null || true
 
       - name: Run ESLint
-        if: steps.linters.outputs.selected contains 'eslint'
+        if: contains(steps.linters.outputs.selected, 'eslint')
         continue-on-error: true
         shell: bash
         run: |
@@ -86,7 +89,7 @@ jobs:
           fi
 
       - name: Run Prettier check
-        if: steps.linters.outputs.selected contains 'prettier'
+        if: contains(steps.linters.outputs.selected, 'prettier')
         continue-on-error: true
         shell: bash
         run: |
@@ -97,7 +100,7 @@ jobs:
           fi
 
       - name: Run Markdownlint
-        if: steps.linters.outputs.selected contains 'markdownlint'
+        if: contains(steps.linters.outputs.selected, 'markdownlint')
         continue-on-error: true
         shell: bash
         run: |
@@ -108,7 +111,7 @@ jobs:
           fi
 
       - name: Run ShellCheck
-        if: steps.linters.outputs.selected contains 'shellcheck'
+        if: contains(steps.linters.outputs.selected, 'shellcheck')
         continue-on-error: true
         shell: bash
         run: |
@@ -116,7 +119,7 @@ jobs:
           find . -type f -name '*.sh' -not -path './node_modules/*' -not -path './.git/*' -exec shellcheck {} + 2>&1 || echo "::warning::ShellCheck found issues"
 
       - name: Run YAMLlint
-        if: steps.linters.outputs.selected contains 'yamllint'
+        if: contains(steps.linters.outputs.selected, 'yamllint')
         continue-on-error: true
         shell: bash
         run: |
@@ -128,7 +131,7 @@ jobs:
           fi
 
       - name: Run actionlint
-        if: steps.linters.outputs.selected contains 'actionlint'
+        if: contains(steps.linters.outputs.selected, 'actionlint')
         continue-on-error: true
         shell: bash
         run: |

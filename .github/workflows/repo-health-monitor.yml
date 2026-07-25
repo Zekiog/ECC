@@ -12,7 +12,6 @@ concurrency:
 permissions:
   contents: read
   actions: read
-  metadata: read
 
 jobs:
   health:
@@ -31,9 +30,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
-          METRICS="artifacts/health-metrics.json"
           python3 - <<'PY'
-          import json, os, re, glob, subprocess, hashlib
+          import json, os, re, glob
           from datetime import datetime, timezone
           metrics = {
               'timestamp': datetime.now(timezone.utc).isoformat(),
@@ -44,7 +42,6 @@ jobs:
               'dependencies': {},
               'overall_health': 'unknown',
           }
-          # Feature checks
           files = set(os.listdir('.'))
           gh_files = set(os.listdir('.github')) if os.path.isdir('.github') else set()
           wf_files = set(os.listdir('.github/workflows')) if os.path.isdir('.github/workflows') else set()
@@ -55,10 +52,9 @@ jobs:
               'has_codeowners': any(os.path.exists(p) for p in ['CODEOWNERS', '.github/CODEOWNERS']),
               'has_dependabot': os.path.exists('.github/dependabot.yml') or os.path.exists('.github/dependabot.yaml'),
               'has_workflows': bool(wf_files),
-              'has_issue_templates': 'ISSUE_TEMPLATE' in gh_files or any(f.startswith('issue_template') for f in gh_files),
-              'has_pr_template': any(f.startswith('pull_request_template') for f in gh_files) or any(f.startswith('PULL_REQUEST_TEMPLATE') for f in gh_files),
+              'has_issue_templates': 'ISSUE_TEMPLATE' in gh_files or any(f.lower().startswith('issue_template') for f in gh_files),
+              'has_pr_template': any(f.lower().startswith('pull_request_template') for f in gh_files),
           }
-          # Workflow counts
           for wf in wf_files:
               if wf.endswith('.yml') or wf.endswith('.yaml'):
                   with open(f'.github/workflows/{wf}') as f:
@@ -70,7 +66,6 @@ jobs:
                       'pinned_actions': len(re.findall(r'uses:\s*[\w\-]+/[\w\-]+@[0-9a-f]{40}', content)),
                       'unpinned_actions': len(re.findall(r'uses:\s*[\w\-]+/[\w\-]+@v\d+', content)),
                   }
-          # Score
           score = 0
           score += 1 if metrics['features']['has_license'] else 0
           score += 1 if metrics['features']['has_readme'] else 0
@@ -79,14 +74,12 @@ jobs:
           score += 1 if metrics['features']['has_security_md'] else 0
           score += 1 if metrics['features']['has_workflows'] else 0
           total_unpinned = sum(w['unpinned_actions'] for w in metrics['workflows'].values())
-          total_workflows = len(metrics['workflows'])
-          if total_workflows > 0:
-              pct_pinned = 1 - (total_unpinned / max(1, sum(w['pinned_actions'] + w['unpinned_actions'] for w in metrics['workflows'].values())))
+          total_actions = sum(w['pinned_actions'] + w['unpinned_actions'] for w in metrics['workflows'].values())
+          if total_actions > 0:
+              pct_pinned = 1 - (total_unpinned / total_actions)
               score += pct_pinned
           metrics['score'] = round(score / 6 * 100, 1)
           metrics['overall_health'] = 'good' if metrics['score'] >= 80 else 'fair' if metrics['score'] >= 50 else 'poor'
-          with open(metrics['features'].get('_path', 'artifacts/health-metrics.json'), 'w') as f:
-            pass
           with open('artifacts/health-metrics.json', 'w') as f:
               json.dump(metrics, f, indent=2)
           print(f"Health score: {metrics['score']}/{metrics['overall_health']}")
