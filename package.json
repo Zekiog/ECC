@@ -372,11 +372,12 @@
     "typescript": "^6.0.3"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.18.0"
   },
   "overrides": {
     "markdown-it": ">=14.2.0",
-    "js-yaml": ">=4.2.0"
+    "js-yaml": ">=4.2.0",
+    "fast-uri": "^3.0.7"
   },
   "resolutions": {
     "markdown-it": ">=14.2.0",
