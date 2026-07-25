@@ -1,0 +1,49 @@
+name: 'Setup Python with cache'
+description: 'Sets up Python with automatic pip cache. Fail-safe.'
+inputs:
+  python-version:
+    description: 'Python version (e.g., 3.12, 3.11)'
+    required: false
+    default: '3.12'
+  cache:
+    description: 'Cache type (pip, poetry, uv)'
+    required: false
+    default: 'pip'
+  cache-dependency-path:
+    description: 'Path to lockfile for cache key'
+    required: false
+    default: ''
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5.6.0
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Cache pip dependencies
+      if: inputs.cache == 'pip'
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.3.0
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ inputs.cache-dependency-path || hashFiles('**/requirements*.txt', '**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install uv
+      if: inputs.cache == 'uv'
+      shell: bash
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+    - name: Cache uv dependencies
+      if: inputs.cache == 'uv'
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.3.0
+      with:
+        path: |
+          .venv
+          ~/.cache/uv
+        key: ${{ runner.os }}-uv-${{ inputs.cache-dependency-path || hashFiles('**/uv.lock', '**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-uv-

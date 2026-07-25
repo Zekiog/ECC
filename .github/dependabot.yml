@@ -1,102 +1,81 @@
+# Dependabot configuration — safe defaults
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-      - "npm"
-    groups:
-      npm-minor-and-patch:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-      npm-security:
-        applies-to: "security-updates"
-        patterns:
-          - "*"
-
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
-    labels:
-      - "dependencies"
-      - "ci"
+      time: "06:00"
+    open-pull-requests-limit: 5
     groups:
-      actions-security:
-        applies-to: "security-updates"
-        patterns:
-          - "*"
-      actions-minor-and-patch:
+      actions-minor:
         patterns:
           - "*"
         update-types:
           - "minor"
           - "patch"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+      - "automated"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "dependencies"
+      - "automated"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
-    labels:
-      - "dependencies"
-      - "python"
+      day: "wednesday"
+      time: "06:00"
+    open-pull-requests-limit: 5
     groups:
-      pip-security:
-        applies-to: "security-updates"
-        patterns:
-          - "*"
-      pip-minor-and-patch:
+      pip-minor:
         patterns:
           - "*"
         update-types:
           - "minor"
           - "patch"
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "dependencies"
+      - "automated"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
-  - package-ecosystem: "pip"
-    directory: "/skills/skill-comply"
+  - package-ecosystem: "docker"
+    directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
+      day: "thursday"
+      time: "06:00"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "docker"
     labels:
       - "dependencies"
-      - "python"
-    groups:
-      skill-comply-pip-security:
-        applies-to: "security-updates"
-        patterns:
-          - "*"
-      skill-comply-pip-minor-and-patch:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "cargo"
-    directory: "/ecc2"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    labels:
-      - "dependencies"
-      - "rust"
-    groups:
-      cargo-security:
-        applies-to: "security-updates"
-        patterns:
-          - "*"
-      cargo-minor-and-patch:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
+      - "automated"

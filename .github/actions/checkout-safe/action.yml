@@ -1,0 +1,30 @@
+name: 'Checkout safe'
+description: 'Checkout with persist-credentials=false and optional submodules disabled. Default-safe.'
+inputs:
+  ref:
+    description: 'Ref to checkout'
+    required: false
+    default: ''
+  fetch-depth:
+    description: 'Fetch depth (0 for full history)'
+    required: false
+    default: '1'
+  token:
+    description: 'Token to use (defaults to GITHUB_TOKEN with read-only if possible)'
+    required: false
+    default: ''
+  submodules:
+    description: 'Whether to checkout submodules'
+    required: false
+    default: 'false'
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      with:
+        ref: ${{ inputs.ref }}
+        fetch-depth: ${{ inputs.fetch-depth }}
+        token: ${{ inputs.token }}
+        submodules: ${{ inputs.submodules }}
+        persist-credentials: false
