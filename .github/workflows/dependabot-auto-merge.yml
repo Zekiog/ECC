@@ -1,0 +1,120 @@
+name: Dependabot Auto-Merge
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  auto-merge:
+    name: Auto-merge patch/minor Dependabot PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+
+    if: |
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.draft == false
+
+    steps:
+      - name: Checkout base
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          persist-credentials: false
+
+      - name: Reject if any dependency bump is major
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Dependabot PR bodies include lines like:
+          #   "Bumps [pkg](url) from 1.2.3 to 1.3.0."
+          # or:
+          #   "Updates [pkg](url) to 2.0.0."
+          # Re-parse every such line and reject if any version is a major bump.
+          # This is defense-in-depth on top of .github/dependabot.yml's
+          # `version-update:semver-major` ignore rule.
+          BODY=$(gh pr view "$PR_NUMBER" --json body --jq -r '.body')
+          echo "PR body excerpt:"
+          echo "$BODY" | head -60
+
+          MAJOR_BUMP=0
+          while IFS= read -r line; do
+            case "$line" in
+              *"from "*" to "*) ;;
+              *" to "*) ;;
+              *) continue ;;
+            esac
+            FROM=$(printf '%s\n' "$line" | sed -nE 's/.*from ([^ ]+).*/\1/p' || true)
+            FROM=$(printf '%s' "$FROM" | sed -E 's/[.,;)]+$//' || true)
+            TO=$(printf '%s\n' "$line" | sed -nE 's/.* to ([^ ]+).*/\1/p' || true)
+            TO=$(printf '%s' "$TO" | sed -E 's/[.,;)]+$//' || true)
+            [ -z "$TO" ] && continue
+            # Extract MAJOR from semver-like tokens (handle v prefix, pre-release suffix).
+            TO_MAJOR=$(printf '%s' "$TO" | grep -oE '^[vV]?[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+            TO_MAJOR=${TO_MAJOR#[vV]}
+            TO_MAJOR=${TO_MAJOR%%.*}
+            [ -z "$TO_MAJOR" ] && continue
+            if [ -z "$FROM" ]; then
+              FROM_MAJOR="$TO_MAJOR"
+            else
+              FROM_MAJOR=$(printf '%s' "$FROM" | grep -oE '^[vV]?[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+              FROM_MAJOR=${FROM_MAJOR#[vV]}
+              FROM_MAJOR=${FROM_MAJOR%%.*}
+              [ -z "$FROM_MAJOR" ] && FROM_MAJOR="$TO_MAJOR"
+            fi
+            if [ "$FROM_MAJOR" != "$TO_MAJOR" ]; then
+              echo "::error::Major bump detected: '$FROM' -> '$TO'"
+              MAJOR_BUMP=1
+            fi
+          done <<< "$BODY"
+
+          if [ "$MAJOR_BUMP" -ne 0 ]; then
+            echo "Refusing to auto-merge: at least one dependency bump is a major version change."
+            exit 1
+          fi
+          echo "All dependency bumps are patch or minor."
+
+      - name: Wait for all status checks to pass
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          echo "Waiting up to 30 minutes for status checks to complete..."
+          # gh pr checks --watch blocks until completion and exits non-zero on failure.
+          gh pr checks "$PR_NUMBER" --watch --interval 15
+
+      - name: Verify merge state is clean
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          STATE=$(gh pr view "$PR_NUMBER" --json mergeStateStatus --jq -r '.mergeStateStatus')
+          echo "mergeStateStatus: $STATE"
+          if [ "$STATE" != "CLEAN" ]; then
+            echo "::error::mergeStateStatus is '$STATE'; expected 'CLEAN' (no conflicts, not behind, all checks passed)."
+            exit 1
+          fi
+
+      - name: Enable auto-merge (squash)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr merge "$PR_NUMBER" --auto --squash --delete-branch
+          echo "Auto-merge enabled. GitHub will merge once branch protection conditions are met (if configured)."
