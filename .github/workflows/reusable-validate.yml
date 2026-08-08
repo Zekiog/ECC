@@ -9,6 +9,11 @@ on:
         type: string
         default: '20.x'
 
+# Pure read-only validation. Callers needing write/OIDC/attestation
+# must grant them explicitly at the call site.
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: Validate Components

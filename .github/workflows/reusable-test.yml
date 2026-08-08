@@ -19,6 +19,16 @@ on:
         type: string
         default: 'npm'
 
+# Minimum-privilege baseline. A called reusable workflow can only
+# retain or reduce the caller token's effective permissions; it cannot
+# raise them. Callers needing write/OIDC/attestation permissions must
+# grant them explicitly at the call site via their own `permissions:`
+# block (top-level or per-job), since this reusable workflow will not
+# expand them.
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   test:
     name: Test

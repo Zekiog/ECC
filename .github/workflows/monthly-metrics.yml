@@ -9,10 +9,15 @@ permissions:
   contents: read
   issues: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   snapshot:
     name: Update metrics issue
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Update monthly metrics issue
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
