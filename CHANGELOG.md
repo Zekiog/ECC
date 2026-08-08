@@ -5,6 +5,7 @@
 ### Changed
 
 - Default MCP connector set reduced to a single connector (`chrome-devtools`) per the new connector policy (`docs/MCP-CONNECTOR-POLICY.md`). The six previous defaults (`github`, `context7`, `exa`, `memory`, `playwright`, `sequential-thinking`) were retired after the June 2026 audit: their jobs are covered by skills wrapping CLIs/REST APIs (`github-ops`, `documentation-lookup`, `exa-search`, e2e skills) or by harness-native features (memory, extended thinking, web search). All six remain opt-in via `mcp-configs/mcp-servers.json`.
+- Bumped `actions/setup-node` from `v6.4.0` (SHA `48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e`) to `v7.0.0` (SHA `820762786026740c76f36085b0efc47a31fe5020`) across 10 GitHub Actions files (17 sites): `.github/actions/setup-node-cache/action.yml` plus `audit.yml`, `ci.yml`, `lint.yml`, `maintenance.yml`, `release.yml`, `reusable-release.yml`, `reusable-test.yml`, `reusable-validate.yml`, and `supply-chain-watch.yml`. v7.0.0 migrates the action runtime to ESM and upgrades `@actions/cache` to `5.1.0`; all hosts used by these workflows run Node 20+, so no runtime change is required. The unrelated `v6.3.0` pin in `generator-generic-ossf-slsa3-publish.yml` (a generator template) is intentionally left alone for a separate change.
 
 ## 2.0.0 - 2026-06-09
 
